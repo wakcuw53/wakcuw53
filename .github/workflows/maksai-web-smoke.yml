@@ -1,0 +1,41 @@
+name: Smoke test MaksAI Web runtime
+on:
+  push:
+    branches: [maksai-vps-installer]
+    paths: ['.github/workflows/maksai-web-smoke.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - name: Download published runtime and verify checksum
+        run: |
+          mkdir -p /tmp/maksai-smoke
+          cd /tmp/maksai-smoke
+          curl -fLsS --retry 3 -O https://github.com/wakcuw53/wakcuw53/releases/download/maksai-web-v0.1/zcode-3.14.3.tar.gz
+          curl -fLsS --retry 3 -O https://github.com/wakcuw53/wakcuw53/releases/download/maksai-web-v0.1/sha256.txt
+          sha256sum -c sha256.txt
+          tar -xzf zcode-3.14.3.tar.gz
+          test -e zcode/bin/zcode.mjs
+      - name: Start and test Web server
+        run: |
+          set -euxo pipefail
+          cd /tmp/maksai-smoke
+          mkdir -p workspace
+          node zcode/bin/zcode.mjs --web --host 127.0.0.1 --port 31340 --workspace /tmp/maksai-smoke/workspace --token test-token-smoke-unique-0001 --no-open >/tmp/maksai-server.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" || true; cat /tmp/maksai-server.log' EXIT
+          ok=0
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null 'http://127.0.0.1:31340/?token=test-token-smoke-unique-0001'; then ok=1; break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          if [ "$ok" != 1 ]; then exit 1; fi
+          echo 'MaksAI Web HTTP and agent startup check passed'
