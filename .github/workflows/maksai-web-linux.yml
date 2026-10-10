@@ -1,0 +1,54 @@
+name: Build MaksAI Web Linux runtime
+on:
+  push:
+    branches: [maksai-vps-installer]
+    paths: ['.github/workflows/maksai-web-linux.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout release scripts
+        uses: actions/checkout@v4
+        with:
+          ref: maksai-vps-installer
+      - name: Checkout original ZCode source
+        run: git clone --depth=1 https://github.com/zai-org/ZCode.git upstream
+      - name: Setup Node 24.14.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - name: Setup pnpm 10.33.2
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10.33.2'
+          run_install: false
+      - name: Build branded web distribution
+        working-directory: upstream
+        env:
+          CI: 'true'
+          HUSKY: '0'
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          python3 ../brand_web.py
+          pnpm install --frozen-lockfile
+          pnpm build:zcode --base-url https://github.com/wakcuw53/wakcuw53/releases/download/maksai-web-v0.1/
+      - name: Inspect output
+        run: |
+          ls -lh upstream/dist/zcode/releases/*/*
+          test -f upstream/dist/zcode/releases/3.14.3/zcode-3.14.3.tar.gz
+          test -f upstream/dist/zcode/releases/3.14.3/sha256.txt
+      - name: Publish Linux runtime release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create maksai-web-v0.1 \
+            upstream/dist/zcode/releases/3.14.3/zcode-3.14.3.tar.gz \
+            upstream/dist/zcode/releases/3.14.3/sha256.txt \
+            --title "MaksAI Web 0.1 Linux runtime" \
+            --notes "Based on the Apache-2.0 ZCode v3.14.3 Web/Agent runtime. Unofficial MaksAI rebrand. Does not include an AI API key." \
+            --target maksai-vps-installer
