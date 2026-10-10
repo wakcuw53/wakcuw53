@@ -1,4 +1,5 @@
 name: Build MaksAI Web Linux runtime
+# Web-only runtime: skip unused CLI TUI assets.
 on:
   push:
     branches: [maksai-vps-installer]
