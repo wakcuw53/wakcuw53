@@ -18,3 +18,12 @@ loc.write_text(loc.read_text(encoding='utf-8').replace('ZCode','MaksAI'),encodin
 web=root/'packages/web/index.html'
 web.write_text(web.read_text(encoding='utf-8').replace('<title>ZCode</title>','<title>MaksAI</title>'),encoding='utf-8')
 print('MaksAI branding files patched')
+
+# The user only needs the Web UI and Agent, not the terminal TUI distribution.
+# Upstream stageTuiRuntime currently requires unpublished workspace/dist trees.
+package_builder=root/'scripts/build-zcode.mjs'
+code=package_builder.read_text(encoding='utf-8')
+needle='  await stageTuiRuntime(packageRoot);'
+assert needle in code, 'Unexpected ZCode build-zcode.mjs layout'
+code=code.replace(needle, '  console.log("[MaksAI] Web-only package: skipping unused terminal TUI assets");')
+package_builder.write_text(code,encoding='utf-8')
